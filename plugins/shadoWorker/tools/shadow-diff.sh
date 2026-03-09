@@ -188,9 +188,9 @@ format_output() {
     local total_collapsed=0
 
     # Group files by directory
-    for file in "${missing_files[@]}"; do
+    for file in "${missing_files[@]+"${missing_files[@]}"}"; do
         local dir=$(dirname "$file")
-        if [[ -z "${dir_files[$dir]}" ]]; then
+        if [[ -z "${dir_files[$dir]:-}" ]]; then
             dir_files[$dir]="$file"
         else
             dir_files[$dir]="${dir_files[$dir]}|$file"

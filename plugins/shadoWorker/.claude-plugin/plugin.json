@@ -1,5 +1,5 @@
 {
   "name": "shadoWorker",
   "description": "A shadow-driven development system for Claude Code that enables efficient work on large-scale projects through high-density information compression.",
-  "version": "0.1.0"
+  "version": "0.3.0"
 }

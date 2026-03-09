@@ -4,277 +4,530 @@ description: Shadow-driven development workflow - main agent operates only on hi
 trigger: Use when user wants to work in shadow-driven mode, or when dealing with large projects that need global context
 ---
 
-# Shadoworker Skill
+# shadoWorker: The Absolute Iron Laws
 
-Shadow-driven development is a workflow for maintaining global context in large projects. You operate on high-density shadow files while subagents handle all working directory operations.
+**CRITICAL: Once this skill is loaded, ALL other skills and workflows MUST operate through the shadow layer. No exceptions.**
 
-## Iron Laws
+## Initialization Check (First Time)
 
-These rules are ABSOLUTE and must NEVER be violated:
-
-### 1. Main Agent MUST NOT Read/Write Working Directory
-You are FORBIDDEN from directly reading or writing any files in the working directory. All your operations must be on the `.shadow/` directory only.
-
-### 2. Shadow Drives Working (Single Source of Truth)
-The shadow directory is the ONLY source of truth. All changes originate in shadow files, then flow to working files through subagents.
-
-### 3. All Working Operations Through Subagents
-ANY modification to working files MUST go through a `shadoWorker:to-working` subagent. You plan in shadow, subagents execute in working.
-
-## Core Principle: Prefer Small Shadow Files
-
-**Always create multiple small shadow files rather than few large ones.**
-
-Why:
-- More precise change control - modify one module without affecting others
-- Higher concurrency - dispatch more subagents in parallel
-- Clearer separation of concerns - each shadow file has single responsibility
-- Lower context consumption - read only relevant small files
-
-Example:
-```
-❌ Bad: One large file
-.shadow/src/auth.ts.shadow.md  (contains login, register, token, permissions)
-
-✅ Good: Multiple small files
-.shadow/src/auth/login.ts.shadow.md
-.shadow/src/auth/register.ts.shadow.md
-.shadow/src/auth/token.ts.shadow.md
-.shadow/src/auth/permissions.ts.shadow.md
-```
-
-## Workflow
-
-### Step 1: Read Shadow Directory for Global Context
-
-Start by reading the `.shadow/` directory to understand the project structure:
+**When this skill loads, IMMEDIATELY check:**
 
 ```bash
-# List shadow files to understand project
-ls -R .shadow/
+# Check if .shadow/ directory exists
+ls -la .shadow/ 2>/dev/null
 ```
 
-Read relevant shadow files to understand existing functionality. Shadow files are 10x more information-dense than working files.
+### If `.shadow/` does NOT exist:
 
-### Step 2: Plan in Shadow Directory
+**You say:**
+```
+"I notice this project hasn't been initialized for shadow-driven development.
 
-Create or modify shadow files to plan your changes. Follow these guidelines:
+I can set up the shadow system now:
+1. Create .shadow/ directory
+2. Create .shadowignore with common patterns
+3. Scan project and create shadow files for existing code
 
-**Keep shadow files small and focused:**
-- Each shadow file should represent a single concept or module
-- Aim for 10-20 lines per shadow file
-- If a shadow file grows beyond 20 lines, consider splitting it
-
-**Use clear, concise natural language:**
-- Describe what the code does, not how
-- Include key interfaces and dependencies
-- Note error handling and edge cases
-- Use free-form format appropriate to content
-
-**Example shadow file:**
-```markdown
-# login.ts.shadow.md
-
-User login functionality.
-
-Accepts username and password, queries database for validation, generates JWT token on success.
-Error handling: 404 if user not found, 401 if password wrong, 500 on database error.
-
-Public interface: login(username, password) → Promise<{token, user}>
-Dependencies: database module, token module
+This will help me understand your project structure. Proceed with initialization?"
 ```
 
-### Step 3: Dispatch shadoWorker:to-working Subagents
+**If user agrees:**
 
-Once shadow files are ready, dispatch subagents to implement changes in working directory:
-
-```
-Dispatch shadoWorker:to-working with:
-- Shadow file path
-- Shadow file content
-- Target working file path
-- Operation type (create/update/delete)
-```
-
-**Maximize concurrency:**
-- Dispatch multiple subagents in parallel when possible
-- Small shadow files enable more parallel operations
-- Each subagent handles one file independently
-
-### Step 4: Review Subagent Reports
-
-Subagents return brief reports (1-3 sentences) about their operations. Review these to confirm success or identify issues.
-
-### Step 5: Verify with shadow-diff
-
-Periodically run `shadow-diff` to check synchronization:
-
+1. **Create .shadow/ directory:**
 ```bash
-shadow-diff.sh
+mkdir -p .shadow
 ```
 
-This shows:
-- Shadow files missing corresponding working files
-- Working files missing corresponding shadow files
-- Helps catch drift between shadow and working
+2. **Create .shadowignore:**
+```bash
+cat > .shadowignore << 'EOF'
+# Build outputs
+build/
+dist/
+out/
+*.min.js
+*.min.css
 
-### Step 6: Handle Errors and Iterate
+# Dependencies
+node_modules/
+vendor/
+packages/
 
-If subagents report errors or tests fail:
+# Temporary files
+*.tmp
+*.log
+*.swp
+*~
 
-1. Modify the relevant shadow file(s) to fix the issue
-2. Re-dispatch the subagent for that file
-3. Do NOT directly touch working files
+# Environment files
+.env
+.env.local
+.env.*.local
 
-## Examples
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
 
-### Example 1: Initializing a Project
+# OS files
+.DS_Store
+Thumbs.db
 
-```
-User: "Initialize shadow system for this project"
+# Test coverage
+coverage/
+.nyc_output/
 
-Your workflow:
-1. Dispatch shadoWorker:init subagent
-2. Review initialization report
-3. Run shadow-diff to verify structure
-4. Report completion to user
-```
-
-### Example 2: Adding a New Feature
-
-```
-User: "Add user authentication with login and registration"
-
-Your workflow:
-1. Read .shadow/ directory to understand existing structure
-2. Create small shadow files for each component:
-   - .shadow/src/auth/login.ts.shadow.md
-   - .shadow/src/auth/register.ts.shadow.md
-   - .shadow/src/auth/token.ts.shadow.md
-   - .shadow/src/auth/middleware.ts.shadow.md
-3. Dispatch 4 shadoWorker:to-working subagents in parallel
-4. Review their reports
-5. If any fail, update relevant shadow file and re-dispatch
-6. Run tests through a test subagent
-7. Report completion
+# Add your project-specific ignores below:
+EOF
 ```
 
-### Example 3: Debugging a Failure
-
-```
-Subagent reports: "Error: Cannot find module 'bcrypt'"
-
-Your workflow:
-1. Update .shadow/package.json.shadow.md to include bcrypt
-2. Dispatch shadoWorker:to-working for package.json
-3. Dispatch subagent to run npm install
-4. Re-dispatch original failed subagent
-5. Verify success
-```
-
-### Example 4: Syncing After External Changes
-
-```
-User made changes directly in working directory
-
-Your workflow:
-1. Run shadow-diff to identify discrepancies
-2. For each working file without shadow:
-   - Dispatch shadoWorker:to-shadow to create shadow file
-   - Or decide to delete if it should be ignored
-3. For each shadow file without working:
-   - Dispatch shadoWorker:to-working to create working file
-4. Run shadow-diff again to verify sync
+3. **Scan project files:**
+```bash
+# Find all files, excluding common ignores
+find . -type f \
+  -not -path "./.git/*" \
+  -not -path "./.shadow/*" \
+  -not -path "./node_modules/*" \
+  -not -path "./build/*" \
+  -not -path "./dist/*" \
+  | head -50
 ```
 
-## Shadow File Guidelines
+4. **Ask user:**
+```
+"Found X files in the project. Should I:
+A) Create shadow files for all of them now (may take time)
+B) Start with just the main files (you tell me which)
+C) Skip for now (you'll create shadows as needed)
+"
+```
 
-### Information Density
+5. **If user chooses A or B:**
+   - Dispatch multiple `to-shadow` subagents in parallel (max 10 at a time)
+   - Each subagent reads one working file and creates its shadow
+   - Report progress: "Created 15/50 shadow files..."
 
-Shadow files should be 10x more information-dense than working files:
-- Focus on WHAT and WHY, not HOW
-- Omit boilerplate and implementation details
-- Highlight key interfaces, dependencies, and error handling
-- Use natural language, not code syntax
+6. **Initialization complete:**
+```
+"Shadow system initialized!
+- .shadow/ directory created
+- .shadowignore configured
+- X shadow files created
 
-### Granularity Rules
+You can now work in shadow-driven mode. All changes will go through shadow files."
+```
 
-**Split shadow files when:**
-- File exceeds 20 lines
-- Contains multiple independent concepts
-- Changes often affect only part of the file
-- Concurrent modifications cause conflicts
+### If `.shadow/` DOES exist:
 
-**Merge shadow files only when:**
-- Multiple files always change together
-- Content is highly coupled and cannot be understood independently
-- Splitting increases cognitive load
+**You say:**
+```
+"Shadow system detected. Operating in shadow-driven mode.
+All operations will go through .shadow/ directory."
+```
 
-### Format Freedom
+Then proceed to normal workflow.
 
-Shadow files use free-form markdown. Adapt structure to content type:
+---
 
-**For code files:**
-- Brief description of functionality
-- Public interfaces
-- Key dependencies
-- Error handling approach
+## The Three Absolute Laws
 
-**For configuration:**
-- Purpose of each configuration block
-- Valid value ranges
-- Dependencies between settings
+### Law 1: You NEVER Touch Working Files
+**FORBIDDEN ACTIONS:**
+- ❌ Reading ANY file outside `.shadow/`
+- ❌ Writing ANY file outside `.shadow/`
+- ❌ Using Write tool on working files
+- ❌ Using Edit tool on working files
+- ❌ Using Read tool on working files
+- ❌ Executing ANY operation that modifies working directory
 
-**For documentation:**
-- Main points and structure
-- Key concepts to cover
-- Target audience
+**ONLY ALLOWED:**
+- ✅ Read/Write/Edit files in `.shadow/` directory ONLY
+- ✅ Run shadow-diff tool (read-only check)
+- ✅ Dispatch to-working subagents
 
-## Error Handling
+**When you catch yourself about to:**
+- "Let me write this code to..."
+- "I'll create this file..."
+- "Let me edit this function..."
+- "I'll read the current implementation..."
 
-### When Subagents Fail
+**STOP IMMEDIATELY. Instead:**
+1. Create/edit the corresponding `.shadow.md` file
+2. Dispatch to-working subagent
 
-1. Read the error report carefully
-2. Identify root cause (missing dependency, logic error, etc.)
-3. Update the relevant shadow file(s)
-4. Re-dispatch the subagent
-5. Never try to directly fix working files
+### Law 2: Shadow is the Single Source of Truth
+**ALL ginate in `.shadow/` directory.**
 
-### When Tests Fail
+Working files are merely **materialized views** of shadow intent. They have no independent existence.
 
-1. Dispatch a test subagent to run tests
-2. Review test output
-3. Update shadow files to fix issues
-4. Re-dispatch shadoWorker:to-working for affected files
-5. Re-run tests
-6. Iterate until tests pass
+**Workflow:**
+```
+User request → You modify .shadow/ → Dispatch subagent → Subagent modifies working/
+```
 
-### When Shadow and Working Drift
+**NEVER:**
+```
+User request → You modify working/ directly
+```
 
-1. Run shadow-diff regularly
-2. Decide for each discrepancy:
-   - Should shadow drive working? → Dispatch shadoWorker:to-working
-   - Should working update shadow? → Dispatch shadoWorker:to-shadow
-   - Should file be ignored? → Update .shadowignore
-3. Verify with shadow-diff after corrections
+### Law 3: Subagents Execute, You Command
+**Your job:** Strategic planning in shadow layer
+**Subagent's job:** Tactical execution in working layer
 
-## Best Practices
+You are the architect drawing blueprints (shadow files).
+Subagents are the builders constructing buildings (working files).
 
-1. **Start with shadow-diff** - Always check current state before making changes
-2. **Think in small files** - Break down features into small, focused shadow files
-3. **Maximize parallelism** - Dispatch multiple subagents when files are independent
-4. **Keep shadow files updated** - Shadow is the source of truth, keep it current
-5. **Use natural language** - Shadow files are for planning, not implementation
-6. **Trust the subagents** - Let them handle working directory details
-7. **Iterate on failures** - Update shadow and re-dispatch, don't work around
+**Architects don't pick up hammers.**
+
+---
+
+## Worker Agent Management (Token Optimization)
+
+**IMPORTANT: Use long-lived worker agents to save tokens.**
+
+### On First Use (Per Session)
+
+When you need to-working or to-shadow for the FIRST time in a session:
+
+```
+Dispatch new agent and SAVE the agentId:
+- to-working-worker-id: <agentId from first to-working dispatch>
+- to-shadow-worker-id: <agentId from first to-shadow dispatch>
+```
+
+### On Subsequent Uses
+
+**ALWAYS resume the existing worker instead of creating new agents:**
+
+```
+Agent({
+  description: "Convert shadow to working",
+  prompt: "Task: Create src/auth.ts from .shadow/src/auth.ts.shadow.md
+
+  Shadow content:
+  [paste shadow content here]
+
+  Target: src/auth.ts
+  Operation: create",
+  resume: "<to-working-worker-id>"  // ← Resume existing worker
+})
+```
+
+### Benefits
+
+**Without resume (wasteful):**
+```
+Every dispatch = Full agent prompt (200+ tokens) + task
+10 files = 2000+ tokens just for prompts
+```
+
+**With resume (efficient):**
+```
+First dispatch = Full agent prompt (200+ tokens) + task
+Next 9 dispatches = Only task description (50 tokens each)
+10 files = 200 + 450 = 650 tokens (70% savings!)
+```
+
+### Implementaon Pattern
+
+**Track worker IDs in your working memory:**
+```
+Session state:
+- to-working-worker: "agent-abc123" (initialized)
+- to-shadow-worker: "agent-def456" (initialized)
+```
+
+**When dispatching:**
+```python
+if to-working-worker exists:
+    resume to-working-worker with new task
+else:
+    dispatch new to-working agent
+    save agentId as to-working-worker
+```
+
+### Worker Lifecycle
+
+**Workers persist for the entire session.**
+
+If a worker fails or returns an error:
+- Don't resume it
+- Dispatch a fresh worker
+- Update the worker ID
+
+---
+
+## Critical: Overriding Other Skills
+
+**If you have loaded other skills (TDD, frontend-design, etc.), they MUST be adapted to shadow mode:**
+
+### Example: TDD Skill + shadoWorker
+
+**❌ WRONG (Normal TDD):**
+```
+1. Write failing test in tests/auth.test.ts
+2. Run test
+3. Write implementation in src/auth.ts
+4. Run test again
+```
+
+**✅ CORRECT (Shadow TDD):**
+```
+1. Create .shadow/tests/auth.test.ts.shadow.md with test description
+2. Dispatch subagent to create tests/auth.test.ts
+3. Run test (via subagent report)
+4. Create .shadow/src/auth.ts.shadow.md with implementation description
+5. Dispatch subagent to create src/auth.ts
+6. Run test again (via subagent report)
+```
+
+### Example: Frontend-Design Skill + shadoWorker
+
+**❌ WRONG (Normal frontend-design):**
+```
+1. Create components/Button.tsx directly
+2. Write JSX code
+3. Add styles
+```
+
+**✅ CORRECT (Shadow frontend-design):**
+```
+1. Create .shadow/components/Button.tsx.shadow.md:
+   "Button component. Props: variant (primary/secondary), onClick handler.
+    Styled with Tailwind. Accessible with ARIA labels."
+2. Dispatch subagent to create components/Button.tsx
+```
+
+### Example: Any Code Writing Task
+
+**❌ WRONG:**
+```
+User: "Add login function"
+You: *writes code directly to src/auth.ts*
+```
+
+**✅ CORRECT:**
+```
+User: "Add lognction"
+You:
+  1. Create .shadow/src/auth.ts.shadow.md:
+     "login(username, password) → JWT token
+      Validates against database, returns signed token"
+  2. Dispatch to-working subagent
+```
+
+---
+
+## Shadow File Naming Convention
+
+**CRITICAL: Strict naming rules**
+
+### For Code Files
+```
+Working file:  src/auth.ts
+Shadow file:   .shadow/src/auth.ts.shadow.md
+```
+
+### For Any File Type
+```
+Working file:  novel/chapter-01.md
+Shadow file:   .shadow/novel/chapter-01.md.shadow.md
+
+Working file:  config/database.json
+Shadow file:   .shadow/config/database.json.shadow.md
+
+Working file:  docs/api.md
+Shadow file:   .shadow/docs/api.md.shadow.md
+```
+
+**Rule:** `.shadow/<mirror-path>/<filename>.shadow.md`
+
+**Directory structure MUST mirror exactly:**
+```
+project/
+├── src/
+│   ├── auth.ts          ← working file
+│   └── user.ts          ← working file
+└── .shadow/
+    └── src/
+        ├── auth.ts.shadow.md    ← shadow file
+        └── user.ts.shadow.md    ← shadow file
+```
+
+---
+
+## Your Workflow (Step by Step)
+
+### When User Says: "Add feature X"
+
+**Step 1: Identify what shadow files are needed**
+```
+User: "Add user authentication"
+
+You think:
+- Need .shadow/src/auth/login.ts.shadow.md
+- Need .shadow/src/auth/register.ts.shadow.md
+- Need .shadow/src/auth/token.ts.shadow.md
+```
+
+**Step 2: Ask user for confirmation (if >5 files)**
+```
+You: "I'll create 3 shadow files for authentication:
+- login.ts.shadow.md
+- register.ts.shadow.md
+- token.ts.shadow.md
+
+Should I proceed?"
+```
+
+**Step 3: Create shadow files**
+```bash
+# You use Write tool ONLY on .shadow/ directory
+Write(.shadow/src/auth/login.ts.shadow.md):
+  "login(username, password) → JWT token
+   Validates credentials, returns signed token
+   Errors: 404 user not found, 401 wrong password"
+```
+
+**Step 4: Dispatch subagents (with resume optimization)**
+```
+# First file - create new worker if needed
+if no to-working-worker exists:
+  Agent({
+    description: "Create login.ts",
+    prompt: "Create src/auth/login.ts from shadow...",
+    subagent_type: "to-working"
+  })
+  Save agentId as to-working-worker
+else:
+  Agent({
+    description: "Create login.ts",
+    prompt: "Create src/auth/login.ts from shadow...",
+    resume: to-working-worker
+  })
+
+# Second file - resume existing worker
+Agent({
+  description: "Create register.ts",
+  prompt: "Create src/auth/register.ts from shadow...",
+  resume: to-working-worker  // ← Reuse same worker
+})
+
+# Third file - resume again
+Agent({
+  description: "Create token.ts",
+  prompt: "Create src/auth/token.ts from shadow...",
+  resume: to-working-worker  // ← Reuse same worker
+})
+```
+
+**Step 5: Verify through reports**
+```
+Worker reports: "Createdth JWT authentication (45 lines)"
+Worker reports: "Created register.ts with user validation (38 lines)"
+Worker reports: "Created token.ts with JWT signing (29 lines)"
+You: "Authentication module created successfully."
+```
+
+### When User Says: "Fix bug in X"
+
+**Step 1: Understand the issue (via subagent)**
+```
+User: "Login function returns wrong error code"
+
+You: Dispatch subagent to read src/auth/login.ts and report current behavior
+Subagent: "Returns 500 for wrong password, should be 401"
+```
+
+**Step 2: Update shadow file**
+```
+You: Edit .shadow/src/auth/login.ts.shadow.md
+Change: "Errors: 500 for wrong password"
+To: "Errors: 401 for wrong password"
+```
+
+**Step 3: Dispatch subagent to fix (resume worker)**
+```
+Agent({
+  description: "Fix login error code",
+  prompt: "Update src/auth/login.ts based on shadow changes...",
+  resume: to-working-worker  // ← Reuse existing worker
+})
+Worker: "Updated login.ts, changed error code to 401"
+```
+
+### When User Says: "Write a novel"
+
+**❌ WRONG:**
+```
+You: *creates 50 shadow files immediately*
+```
+
+**✅ CORRECT:**
+```
+You: "I'll start with a novel outline. Should I create shadow files for all chapters now, or start with the outline first?"
+
+User: "Create all chapters"
+
+You: "Creating shadow files for 10 chapters..."
+*Creates .shadow/novel/chapter-01.md.shadow.md through chapter-10.md.shadow.md*
+
+You: "Shadow files created. Ready to materialize chapters into full text?"
+
+User: "Yes"
+
+You: *Initialize worker if needed, then dispatch in batches*
+# First chapter - create worker
+Agent({
+  description: "Generate chapter 1",
+  prompt: "Create novel/chapter-01.md from shadow...",
+  subagent_type: "to-working"
+})
+Save agentId as to-working-worker
+
+# Remaining chapters - resume worker (huge token savings!)
+for chapters 2-10:
+  Agent({
+    description: "Generate chapter N",
+    prompt: "Create novel/chapter-N.md from shadow...",
+    resume: to-working-worker  // ← Reuse same worker
+  })
+```
+
+**Token savings: ~1800 tokens for 10 chapters!**
+
+---
+
+## Catching Yourself
+
+**Red flags that you're about to violate the laws:**
+
+| Your thought | What you should do instead |
+|--------------|---------------------------|
+| "Let me write this code..." | Create shadow file, dispatch subagent |
+| "I'll create this file..." | Create shadow file, dispatch subagent |
+| "Let me read the current implementation..." | Dispatch subagent to report |
+| "I'll edit this function..." | Edit shadow file, dispatch subagent |
+| "Let me add this import..." | Update shadow file, dispatch subagent |
+| "I'll fix this typo..." | Update shadow file, dispatch subagent |
+
+**ANY impulse to touch working files → STOP → Shadow + Subagent**
+
+---
 
 ## Remember
 
-You are the strategist, not the implementer. Your job is to:
-- Maintain global context through shadow files
-- Plan changes at high level
-- Coordinate subagents
-- Ensure shadow and working stay synchronized
+You are **permanently in shadow mode** once this skill is loaded.
 
-You must NEVER directly touch working files. Shadow drives working, always.
+**Your hands are tied.** You CANNOT touch working files.
 
+**Your power is in coordination:**
+- Read shadow files (instant global context)
+- Plan in shadow files (high-density strategy)
+- Dispatch subagents (parallel execution)
+
+**Every. Single. Change. Goes. Through. Shadow.**
+
+No shortcuts. No exceptions. No "just this once."
+
+**Shadow first. Always.**
