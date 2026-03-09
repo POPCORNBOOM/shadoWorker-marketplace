@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash:*)",
+      "Bash(find .shadow -type f -name \"*.shadow.md\" -exec wc -l {} +)",
+      "Bash(find . -type f -not -path \"./.git/*\" -not -path \"./.shadow/*\" -not -path \"./.claude/*\" -not -name \"LICENSE\" -not -name \".shadowignore\" -exec wc -l {} +)"
+    ]
+  }
+}

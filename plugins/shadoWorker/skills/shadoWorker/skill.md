@@ -181,79 +181,81 @@ Subagents are the builders constructing buildings (working files).
 
 ---
 
-## Worker Agent Management (Token Optimization)
+## Token Optimization Strategy
 
-**IMPORTANT: Use long-lived worker agents to save tokens.**
+**CRITICAL: Minimize token usage through tools and minimal prompts.**
 
-### On First Use (Per Session)
+### 1. Use Existing Tools First
 
-When you need to-working or to-shadow for the FIRST time in a session:
+**ALWAYS use existing shell scripts instead of reimplementing:**
 
+```bash
+# Check sync status between shadow and working
+bash plugins/shadoWorker/tools/shadow-diff.sh
+
+# Future tools (when available):
+# bash plugins/shadoWorker/tools/shadow-sync.sh
+# bash plugins/shadoWorker/tools/shadow-validate.sh
 ```
-Dispatch new agent and SAVE the agentId:
-- to-working-worker-id: <agentId from first to-working dispatch>
-- to-shadow-worker-id: <agentId from first to-shadow dispatch>
-```
 
-### On Subsequent Uses
+**Benefits:**
+- Zero token cost for logic (already in script)
+- Consistent behavior across sessions
+- Faster execution
+- Less prompt complexity
 
-**ALWAYS resume the existing worker instead of creating new agents:**
+### 2. Minimal Subagent Prompts
 
+**Subagent prompts MUST be <50 words.**
+
+Agent instructions live in agent.md files, NOT in dispatch prompts.
+
+**❌ BAD (wasteful):**
 ```
 Agent({
   description: "Convert shadow to working",
-  prompt: "Task: Create src/auth.ts from .shadow/src/auth.ts.shadow.md
+  prompt: "You are a subagent that converts shadow files to working files.
+          Shadow files contain high-density semantic descriptions...
+          [500 words of instructions explaining the entire system]
 
-  Shadow content:
-  [paste shadow content here]
-
-  Target: src/auth.ts
-  Operation: create",
-  resume: "<to-working-worker-id>"  // ← Resume existing worker
+          Now create src/auth.ts from .shadow/src/auth.ts.shadow.md"
 })
 ```
 
-### Benefits
-
-**Without resume (wasteful):**
+**✅ GOOD (efficient):**
 ```
-Every dispatch = Full agent prompt (200+ tokens) + task
-10 files = 2000+ tokens just for prompts
+Agent({
+  description: "Convert shadow to working",
+  prompt: "Create src/auth.ts from .shadow/src/auth.ts.shadow.md
+
+          Shadow content:
+          [paste shadow content]
+
+          Target: src/auth.ts
+          Operation: create"
+})
 ```
 
-**With resume (efficient):**
-```
-First dispatch = Full agent prompt (200+ tokens) + task
-Next 9 dispatches = Only task description (50 tokens each)
-10 files = 200 + 450 = 650 tokens (70% savings!)
-```
+**Token savings: ~450 tokens per dispatch!**
 
-### Implementaon Pattern
+### 3. Long-Lived Workers (Future Enhancement)
 
-**Track worker IDs in your working memory:**
+Track worker IDs to resume existing agents:
+
 ```
 Session state:
-- to-working-worker: "agent-abc123" (initialized)
-- to-shadow-worker: "agent-def456" (initialized)
+- to-working-worker: "agent-abc123"
+- to-shadow-worker: "agent-def456"
+
+On subsequent dispatches:
+Agent({
+  description: "Create login.ts",
+  prompt: "Create src/auth/login.ts from shadow...",
+  resume: to-working-worker  // ← Reuse existing worker
+})
 ```
 
-**When dispatching:**
-```python
-if to-working-worker exists:
-    resume to-working-worker with new task
-else:
-    dispatch new to-working agent
-    save agentId as to-working-worker
-```
-
-### Worker Lifecycle
-
-**Workers persist for the entire session.**
-
-If a worker fails or returns an error:
-- Don't resume it
-- Dispatch a fresh worker
-- Update the worker ID
+**Additional savings: ~70% tokens on repeated dispatches**
 
 ---
 
@@ -389,44 +391,55 @@ Write(.shadow/src/auth/login.ts.shadow.md):
    Errors: 404 user not found, 401 wrong password"
 ```
 
-**Step 4: Dispatch subagents (with resume optimization)**
+**Step 4: Dispatch subagents (minimal prompts)**
 ```
-# First file - create new worker if needed
-if no to-working-worker exists:
-  Agent({
-    description: "Create login.ts",
-    prompt: "Create src/auth/login.ts from shadow...",
-    subagent_type: "to-working"
-  })
-  Save agentId as to-working-worker
-else:
-  Agent({
-    description: "Create login.ts",
-    prompt: "Create src/auth/login.ts from shadow...",
-    resume: to-working-worker
-  })
-
-# Second file - resume existing worker
+# Each dispatch uses <50 word prompts
 Agent({
-  description: "Create register.ts",
-  prompt: "Create src/auth/register.ts from shadow...",
-  resume: to-working-worker  // ← Reuse same worker
+  description: "Create login.ts",
+  prompt: "Create src/auth/login.ts from .shadow/src/auth/login.ts.shadow.md
+
+  Shadow content:
+  [paste shadow content]
+
+  Target: src/auth/login.ts
+  Operation: create"
 })
 
-# Third file - resume again
+Agent({
+  description: "Create register.ts",
+  prompt: "Create src/auth/register.ts from .shadow/src/auth/register.ts.shadow.md
+
+  Shadow content:
+  [paste shadow content]
+
+  Target: src/auth/register.ts
+  Operation: create"
+})
+
 Agent({
   description: "Create token.ts",
-  prompt: "Create src/auth/token.ts from shadow...",
-  resume: to-working-worker  // ← Reuse same worker
+  prompt: "Create src/auth/token.ts from .shadow/src/auth/token.ts.shadow.md
+
+  Shadow content:
+  [paste shadow content]
+
+  Target: src/auth/token.ts
+  Operation: create"
 })
 ```
 
 **Step 5: Verify through reports**
 ```
-Worker reports: "Createdth JWT authentication (45 lines)"
+Worker reports: "Created login.ts with JWT authentication (45 lines)"
 Worker reports: "Created register.ts with user validation (38 lines)"
 Worker reports: "Created token.ts with JWT signing (29 lines)"
 You: "Authentication module created successfully."
+```
+
+**Step 6: Check sync status (optional)**
+```bash
+# Use existing tool to verify shadow/working alignment
+bash plugins/shadoWorker/tools/shadow-diff.sh --dir src/auth
 ```
 
 ### When User Says: "Fix bug in X"
@@ -446,12 +459,16 @@ Change: "Errors: 500 for wrong password"
 To: "Errors: 401 for wrong password"
 ```
 
-**Step 3: Dispatch subagent to fix (resume worker)**
+**Step 3: Dispatch subagent to fix (minimal prompt)**
 ```
 Agent({
   description: "Fix login error code",
-  prompt: "Update src/auth/login.ts based on shadow changes...",
-  resume: to-working-worker  // ← Reuse existing worker
+  prompt: "Update src/auth/login.ts from .shadow/src/auth/login.ts.shadow.md
+
+  Shadow changes: Error code 500 → 401 for wrong password
+
+  Target: src/auth/login.ts
+  Operation: update"
 })
 Worker: "Updated login.ts, changed error code to 401"
 ```
@@ -476,25 +493,19 @@ You: "Shadow files created. Ready to materialize chapters into full text?"
 
 User: "Yes"
 
-You: *Initialize worker if needed, then dispatch in batches*
-# First chapter - create worker
-Agent({
-  description: "Generate chapter 1",
-  prompt: "Create novel/chapter-01.md from shadow...",
-  subagent_type: "to-working"
-})
-Save agentId as to-working-worker
-
-# Remaining chapters - resume worker (huge token savings!)
-for chapters 2-10:
+You: *Dispatch subagents with minimal prompts*
+for chapters 1-10:
   Agent({
     description: "Generate chapter N",
-    prompt: "Create novel/chapter-N.md from shadow...",
-    resume: to-working-worker  // ← Reuse same worker
+    prompt: "Create novel/chapter-N.md from .shadow/novel/chapter-N.md.shadow.md
+
+    Shadow content:
+    [paste shadow content]
+
+    Target: novel/chapter-N.md
+    Operation: create"
   })
 ```
-
-**Token savings: ~1800 tokens for 10 chapters!**
 
 ---
 
@@ -510,8 +521,14 @@ for chapters 2-10:
 | "I'll edit this function..." | Edit shadow file, dispatch subagent |
 | "Let me add this import..." | Update shadow file, dispatch subagent |
 | "I'll fix this typo..." | Update shadow file, dispatch subagent |
+| "Let me check if files are in sync..." | Use shadow-diff.sh tool |
+| "I'll write a script to compare..." | Use existing tools first |
 
 **ANY impulse to touch working files → STOP → Shadow + Subagent**
+
+**ANY impulse to reimplement tools → STOP → Use existing .sh scripts**
+
+**ANY long subagent prompt → STOP → Keep under 50 words**
 
 ---
 

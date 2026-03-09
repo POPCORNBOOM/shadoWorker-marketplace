@@ -1,9 +1,4 @@
----
-name: shadoworker:to-working
-description: Decompress shadow file into working file - pure expansion, no decisions
----
-
-# shadoworker:to-working - Decompressor
+# agent.md.shadow.md (to-working)
 
 Expands shadow files into working files.
 

@@ -1,0 +1,46 @@
+# Build outputs
+build/
+dist/
+out/
+*.min.js
+*.min.css
+
+# Dependencies
+node_modules/
+vendor/
+packages/
+
+# Temporary files
+*.tmp
+*.log
+*.swp
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Version control
+.git/
+
+# Shadow system
+.shadow/
+.shadowignore
+
+# Project-specific
+.claude/
+LICENSE
