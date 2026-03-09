@@ -1,0 +1,13 @@
+{
+  "name": "shadoWorker Marketplace",
+  "owner": {
+    "name": "POPCORNBOOM"
+  },
+  "plugins": [
+    {
+      "name": "shadoWorker",
+      "source": "./plugins/shadoWorker",
+      "description": "A shadow-driven development system for Claude Code that enables efficient work on large-scale projects through high-density information compression."
+    }
+  ]
+}

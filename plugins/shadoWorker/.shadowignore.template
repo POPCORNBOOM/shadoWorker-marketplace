@@ -1,0 +1,40 @@
+# Shadoworker ignore template
+# Copy this to your project root as .shadowignore
+
+# Build outputs
+build/
+dist/
+out/
+*.min.js
+*.min.css
+
+# Dependencies
+node_modules/
+vendor/
+packages/
+
+# Temporary files
+*.tmp
+*.log
+*.swp
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Add your project-specific ignores below:
